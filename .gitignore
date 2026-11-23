@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+# data never goes into git (it is the separate data record; see docs/DATA.md)
+autost_data/
+*.npz
+*.pt
+# this machine's data locations
+configs/*.local.yaml

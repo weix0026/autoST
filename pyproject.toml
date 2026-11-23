@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autost-fire-spread"
+version = "1.0.0"
+description = "AutoST: next-day wildfire spread from daily perimeters, terrain, fuels and weather -- training and evaluation from published crops"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Yu Wei" }]
+dependencies = [
+  "numpy", "scipy", "pandas", "pyyaml", "matplotlib", "torch>=2.5",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools]
+packages = ["autost"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

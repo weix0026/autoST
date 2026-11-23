@@ -1,0 +1,18 @@
+# conda env create -f environment.yml && conda activate autost
+# Tested with the versions below (Windows 11, NVIDIA RTX 5000 Ada, CUDA 12.8).
+# PyTorch: pick the build for your GPU from https://pytorch.org/get-started/
+name: autost
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy=2.3
+  - scipy=1.16
+  - pandas=2.3
+  - pyyaml=6.0
+  - matplotlib=3.10
+  - pytest
+  - pip
+  - pip:
+      # The study used torch 2.9 (CUDA 12.8). Any torch >= 2.5 runs this code.
+      - torch>=2.5

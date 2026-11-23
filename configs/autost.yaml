@@ -1,0 +1,54 @@
+# AutoST: crops, folds, training and evaluation.
+# The crops are published ready-made; the crops settings below record how they
+# were made (and the size and number of input days, which the model reads).
+# Paths are relative to data_root (configs/data.yaml) unless absolute.
+
+seed: 42
+
+channels:
+  # The three fireline channels (hand, dozer, other line), static channels
+  # 11-13, as in the study. The published crops have them (33 static
+  # channels); keep this true.
+  firelines: true
+
+crops:
+  dir: "crops"
+  size: 64
+  per_fire_day: 10           # crops centred on random points of day t's fire edge
+  sequence: 3                # days t-2, t-1, t as input
+  # The original study added one extra example per fire: the last perimeter
+  # repeated on the next day, labelled "no spread". It is not observed.
+  no_spread_day: true
+
+folds:
+  csv: "crops/folds.csv"     # in data_root: published inside crops.zip
+  n: 10
+
+training:
+  out_dir: "models"
+  name: "autost"
+  epochs: 20                 # the study used 100; 20 is enough (docs/CHANGES.md, item 4)
+  batch_size: 16
+  lr: 1.0e-4
+  weight_decay: 0.0
+  lr_factor: 0.7
+  lr_patience: 8
+  early_stop_patience: 100   # 100 = never stop early (as in the study)
+  num_workers: 6             # processes loading crops; changes speed only, not results
+  amp: true                  # mixed precision on the GPU
+  deterministic: true
+
+loss:
+  pos_weight: 4.0
+  bce_weight: 0.4
+  dice_weight: 0.6
+  focal_weight: 0.1
+  gamma: 4.0
+
+evaluation:
+  out_dir: "evaluation"
+  thresholds: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+  band_k: 3                  # "active front" = unburned cells within 3 cells of day t's fire
+  attribution: false         # Integrated Gradients per channel (slow)
+  ig_crops: 600
+  ig_steps: 12

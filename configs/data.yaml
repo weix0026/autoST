@@ -1,0 +1,8 @@
+# Where the data lives.
+#
+# data_root is the folder where you unzipped the published data
+# (crops.zip and models.zip; see docs/DATA.md). It holds crops/ and models/.
+# Every data path in configs/autost.yaml is RELATIVE to it. You can also set
+# the environment variable AUTOST_DATA_ROOT instead of editing this file.
+
+data_root: "./autost_data"
