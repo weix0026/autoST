@@ -6,8 +6,8 @@ have burned by its next mapped perimeter. It reads the last three daily
 perimeters, terrain, fuels, roads, past fires and treatments, firelines, and
 the weather in between.
 
-- **Data.** 49,540 crops of 64 x 64 cells (30 m) from 311 western US fires of
-  2020-2023 and their 5,616 daily infrared perimeters (NIROPS), with the 10
+- **Data.** 46,150 crops of 64 x 64 cells (30 m) from 292 western US fires of
+  2020-2023 and their 5,491 daily infrared perimeters (NIROPS), with the 10
   trained models. They are a separate data record (Zenodo; `docs/DATA.md`
   lists every channel and its source).
 - **Model.** A 3-D U-Net over the input days, with a transformer at the

@@ -17,8 +17,9 @@ crops:
   per_fire_day: 10           # crops centred on random points of day t's fire edge
   sequence: 3                # days t-2, t-1, t as input
   # The original study added one extra example per fire: the last perimeter
-  # repeated on the next day, labelled "no spread". It is not observed.
-  no_spread_day: true
+  # repeated on the next day, labelled "no spread". It is not observed, so
+  # the published crops leave it out. (Used only when crops are built.)
+  no_spread_day: false
 
 folds:
   csv: "crops/folds.csv"     # in data_root: published inside crops.zip
@@ -27,7 +28,7 @@ folds:
 training:
   out_dir: "models"
   name: "autost"
-  epochs: 20                 # the study used 100; 20 is enough (docs/CHANGES.md, item 4)
+  epochs: 15                 # the study used 100; best epochs were 3-7 of 20 (docs/CHANGES.md, item 4)
   batch_size: 16
   lr: 1.0e-4
   weight_decay: 0.0

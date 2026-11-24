@@ -8,24 +8,30 @@ to that folder (code: GitHub, see `CITATION.cff`):
 <data_root>/
   crops/manifest.csv                 one row per crop
   crops/folds.csv                    which fold each fire is in (columns incident_c, fold)
-  crops/<incident>/<date>_<k>.npz    49,540 crops, 311 fires
+  crops/<incident>/<date>_<k>.npz    46,150 crops from 292 fires
   models/autost_fold<k>.pt           the 10 trained models (k = 1..10)
   models/autost_fold<k>_log.csv      loss and validation scores per epoch
   evaluation/*.csv                   the test scores in the paper
 ```
 
-Each of the 311 fires is in exactly one of 10 folds, 31 or 32 fires per
-fold. Fires were dealt out largest first (by number of perimeters), each to
-the fold with the fewest perimeters so far.
+Each of the 309 fires is in exactly one of 10 folds, 30 to 32 fires per fold
+(28 to 30 of them with crops: 17 fires with only three perimeters have no
+usable fire-day). Fires were dealt out largest first (by number of
+perimeters), each to the fold with the fewest perimeters so far. Two fires
+were then removed because they duplicated others (VicsPeak repeats McKinney's
+perimeters; CA-KNF-007022 Hancock is CA-SRF-000986 Hancock), and Center Creek
+Trail, which lies inside East Fork on the same days, was put in East Fork's
+fold, so no fire is in two folds.
 
 ## What a crop is
 
 Each crop is a 64 x 64 window of 30 m cells (1.92 km on a side) on the fire's
 own grid in its local UTM zone, centred on a random cell of the fire's edge on
-day t. There are 10 crops per usable fire-day (4,954 fire-days). A fire-day is
-usable when the two perimeters before it and the one after it exist. One extra
-fire-day per fire repeats the last perimeter as "no spread" on the next day,
-as in the original study; it is not an observation.
+day t. There are 10 crops per usable fire-day (4,615 fire-days). A fire-day is
+usable when the two perimeters before it and the one after it exist. Every
+target is an observed perimeter: the original study's extra "no spread" day
+(the last perimeter copied to the next day) is left out, because the last
+flight marks when mapping stopped, not when the fire did.
 
 Each `.npz` file (NumPy, compressed) holds three float16 arrays, all in 0-1:
 
@@ -41,7 +47,7 @@ cells where spread can be right or wrong.
 
 `crops/manifest.csv` columns: `file` (path under `crops/`), `incident_c`
 (NIROPS incident id), `date` (day t), `next_date` (day t+1), `row`, `col`
-(the crop centre on the fire's 30 m grid), `filled` (weather layers that were
+(the crop's top-left cell on the fire's 30 m grid), `filled` (weather layers that were
 missing and filled with a typical value; empty for every published crop).
 
 Dates are the UTC dates of the NIROPS infrared flights. Flights are at night,
@@ -64,24 +70,27 @@ flat ground has all 8 aspect channels at 0.
 | 0 | DEM | USGS 3DEP 1 arc-second | elevation m / 4343 |
 | 1 | Slope | from the DEM (Horn 3x3, in metres on the UTM grid) | degrees / 90 |
 | 2-9 | Aspect N, NE, E, SE, S, SW, W, NW | from the DEM | 8 soft direction channels |
-| 10 | Hand Line | fireline engagement archive 2017-2024 | yes/no, line +-30 m |
+| 10 | Hand Line | fireline engagement archive 2017-2024 (Arkowitz et al. 2025) | yes/no, line +-30 m |
 | 11 | Dozer Line | same | yes/no, line +-30 m |
 | 12 | Other Line | same | yes/no, line +-30 m |
-| 13 | Recent Burn | NIFC InterAgency Fire Perimeter History | yes/no: burned in the 20 years before the fire, ending 30 days before it |
+| 13 | Recent Burn | NIFC InterAgency Fire Perimeter History | yes/no: burned in fire years Y-20 to Y-1 (Y = the fire's year) |
 | 14 | Fuel Treatment | USFS FACTS hazardous fuel treatments (Forest Service land only) | yes/no: accomplished mechanical, fire or other treatment in the 20 years before the fire |
 | 15-26 | FM1 ... FM12 | LANDFIRE FBFM13 | yes/no for fuel models 1-12 |
 | 27 | FM13+ | LANDFIRE FBFM13 | yes/no: fuel model 13, non-burnable (91-99) or no data |
 | 28 | Canopy Cover | LANDFIRE CC | percent / 100 |
 | 29 | Canopy Base Height | LANDFIRE CBH | m x 10 / 100 |
 | 30 | Crown Bulk Density | LANDFIRE CBD | kg/m3 x 100 / 45 |
-| 31 | Roads | HERE road network | yes/no, line +-30 m |
+| 31 | Roads | US Census TIGER/Line roads of the fire's year (vehicular: walkways, stairways, bike and bridle paths left out) | yes/no, line +-30 m |
 | 32 | PODs | National Potential Operational Delineations | yes/no, boundary +-30 m |
 
 Firelines: every line of the fire's year in the archive within 1 km of the
 fire's final perimeter, as in the original study; the same on every day of
 the fire. LANDFIRE: the newest release before the fire's year that the
 LANDFIRE Product Service offers, LF2016 for fires of 2020-2022 and LF2022 for
-2023.
+2023. Roads: TIGER/Line of year Y shows roads as of about January 1 of Y.
+PODs: the national POD layer is a current map; about 95% of its boundaries
+carry a version date after the fire started, so some may follow later fire
+edges.
 
 **Dynamic channels** (for each of days t-2, t-1, t)
 
@@ -106,8 +115,8 @@ were filled with wind 5 m/s, BI 50, 293.15 K, 100-h moisture 20 % and VPD
 
 ## Trained models
 
-`models/autost_fold<k>.pt` is the model for test fold k: trained on eight
-folds, with fold k+1 (fold 1 after fold 10) used to choose the epoch and the
+`models/autost_fold<k>.pt` is the model for test fold k: trained for 15 epochs
+on eight folds, with fold k+1 (fold 1 after fold 10) used to choose the epoch and the
 probability threshold. Each file is a PyTorch dictionary with `model` (the
 weights), `epoch`, `threshold`, `validation` (the validation scores),
 `fold`, `validation_fold`, the channel names and the full `config`.
@@ -116,6 +125,9 @@ weights), `epoch`, `threshold`, `validation` (the validation scores),
 ## Licences of the sources
 
 The crops are derived from the sources above. NIROPS, 3DEP, LANDFIRE,
-gridMET, TopoFire, NIFC fire history, FACTS and the national PODs are public.
-The fireline engagement archive is published as [CITE THE FIRELINE DATASET].
-The road channel is derived from the licensed HERE road network.
+gridMET, TopoFire, NIFC fire history, FACTS, the national PODs and TIGER/Line
+(public domain) are public.
+The fireline engagement archive is published as: Arkowitz, A., Ritter, S.M.,
+Thompson, M.P., et al. 2025. Quality assured spatial dataset of wildfire
+containment firelines and engagement outcomes 2017 to 2024. Scientific Data
+12, 897. https://doi.org/10.1038/s41597-025-05208-0
