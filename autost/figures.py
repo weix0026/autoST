@@ -251,17 +251,59 @@ def fig_correlation(cfg, out, n=5000, seed=7):
 
 
 # --------------------------------------------------------------- figure 5
-def fig_crop_example(cfg, models, out, seed=11):
+def _variety(s, d):
+    """How much a crop shows: inputs that vary inside it, management layers present."""
+    chans = np.concatenate([s, d[-1]])
+    varying = int((chans.reshape(len(chans), -1).std(axis=1) > 0.02).sum())
+    names = CH.static_names(s.shape[0] == 33)
+    present = sum(bool(s[names.index(n)].any()) for n in
+                  ("Hand Line", "Dozer Line", "Other Line", "Recent Burn", "Fuel Treatment", "Roads", "PODs")
+                  if n in names)
+    fuels = sum(bool(s[names.index(f"FM{k}")].mean() > 0.03) for k in range(1, 13))
+    return varying + 2 * present + fuels
+
+
+def _variety(s, d):
+    """How much a crop shows: inputs that vary inside it, management layers present."""
+    chans = np.concatenate([s, d[-1]])
+    varying = int((chans.reshape(len(chans), -1).std(axis=1) > 0.02).sum())
+    names = CH.static_names(s.shape[0] == 33)
+    present = sum(bool(s[names.index(n)].any()) for n in
+                  ("Hand Line", "Dozer Line", "Other Line", "Recent Burn", "Fuel Treatment", "Roads", "PODs")
+                  if n in names)
+    fuels = sum(bool(s[names.index(f"FM{k}")].mean() > 0.03) for k in range(1, 13))
+    return varying + 2 * present + fuels
+
+
+def fig_crop_example(cfg, models, out, seed=11, pool=4000, shortlist=300, min_f1=0.7):
+    """One test crop that shows the inputs well and that the model gets mostly right:
+    from `pool` random test crops with a clear band of new spread, the `shortlist`
+    with the most varied inputs are predicted, and the most varied one with
+    F1 >= min_f1 is drawn (else the best F1)."""
     plt = _plt()
-    (row, s, d, y), = _test_crops(cfg, 1, seed, min_new=300)
+    cands = []
+    for row, s, d, y in _test_crops(cfg, pool, seed, min_new=150):
+        today, target = d[-1, 0] > 0, y[0] > 0
+        new = (target & ~today).sum() / max((~today).sum(), 1)
+        if 0.15 <= today.mean() <= 0.7 and 0.05 <= new <= 0.5:
+            cands.append((_variety(s, d), row, s, d, y))
+    cands.sort(key=lambda c: -c[0])
+    cands = cands[:shortlist]
+    scored = []
+    for fold in sorted({int(c[1]["fold"]) for c in cands}):
+        sub = [c for c in cands if int(c[1]["fold"]) == fold]
+        prob, thr = models.predict(fold, np.stack([c[2] for c in sub]), np.stack([c[3] for c in sub]))
+        for (v, row, s, d, y), p in zip(sub, prob):
+            today, target = d[-1, 0] > 0, y[0] > 0
+            pred, m = p >= thr, ~(d[-1, 0] > 0)
+            tp, fp, fn = (pred & target & m).sum(), (pred & ~target & m).sum(), (~pred & target & m).sum()
+            scored.append((2 * tp / max(2 * tp + fp + fn, 1), v, row, s, d, y, p, thr))
+    good = [c for c in scored if c[0] >= min_f1]
+    f1, v, row, s, d, y, prob, thr = (max(good, key=lambda c: (c[1], c[0])) if good
+                                      else max(scored, key=lambda c: c[0]))
     fold = int(row["fold"])
-    prob, thr = models.predict(fold, s[None], d[None])
-    prob = prob[0]
     today, target = d[-1, 0] > 0, y[0] > 0
     pred = prob >= thr
-    m = ~today
-    tp, fp, fn = (pred & target & m).sum(), (pred & ~target & m).sum(), (~pred & target & m).sum()
-    f1 = 2 * tp / max(2 * tp + fp + fn, 1)
     names = CH.static_names(s.shape[0] == 33) + [f"{n} (day t)" for n in CH.DYNAMIC_NAMES]
     chans = np.concatenate([s, d[-1]])
     ncol = 9
@@ -274,15 +316,22 @@ def fig_crop_example(cfg, models, out, seed=11):
         im = ax.imshow(a, vmin=0, vmax=1, cmap="viridis", interpolation="nearest")
         ax.set_title(nm, fontsize=7)
     last = axes[-1]
-    last[0].imshow(target, cmap="Reds", vmin=0, vmax=1, interpolation="nearest")
+    tgt = np.empty(today.shape + (3,), dtype=np.float32)
+    tgt[:] = CROP_RGB["unburned"]
+    tgt[target] = (0.35, 0.35, 0.35)
+    tgt[target & ~today] = (0.85, 0.25, 0.1)
+    last[0].imshow(tgt, interpolation="nearest")
     last[0].set_title("TARGET\nnext perimeter", fontsize=8, fontweight="bold")
-    pim = last[1].imshow(prob, cmap="magma", vmin=0, vmax=1, interpolation="nearest")
-    last[1].set_title(f"PREDICTION\nprobability", fontsize=8, fontweight="bold")
+    last[1].imshow(prob, cmap="magma", vmin=0, vmax=1, interpolation="nearest")
+    last[1].set_title("PREDICTION\nprobability", fontsize=8, fontweight="bold")
     last[2].imshow(_outcome_rgb(today, target, pred, CROP_RGB), interpolation="nearest")
-    last[2].set_title(f"OVERLAY (t = {thr:.2f})\nF1 (spread) = {f1:.2f}", fontsize=8, fontweight="bold")
+    last[2].set_title(f"OVERLAY (th = {thr:.2f})\nF1 (spread) = {f1:.2f}", fontsize=8, fontweight="bold")
     from matplotlib.patches import Patch
-    last[3].legend(handles=[Patch(color=CROP_RGB[k], label=l) for k, l in
-                            [("tp", "hit"), ("fp", "false alarm"), ("fn", "missed"),
+    last[3].legend(handles=[Patch(color=(0.35, 0.35, 0.35), label="target: burning day t"),
+                            Patch(color=(0.85, 0.25, 0.1), label="target: new burn")],
+                   loc="center left", fontsize=7, frameon=False)
+    last[5].legend(handles=[Patch(color=CROP_RGB[k], label=l) for k, l in
+                            [("tp", "TP (hit)"), ("fp", "FP (false alarm)"), ("fn", "FN (missed)"),
                              ("today", "day t fire"), ("unburned", "unburned")]],
                    loc="center left", fontsize=7, frameon=False)
     cax = fig.add_axes([0.92, 0.3, 0.01, 0.4])
@@ -290,6 +339,7 @@ def fig_crop_example(cfg, models, out, seed=11):
     fig.subplots_adjust(right=0.9, top=0.95, hspace=0.45, wspace=0.08)
     fig.suptitle(f"Test crop {row['file']}  (fold {fold} model, day t {row['date']} -> {row['next_date']})",
                  fontsize=10, y=0.985)
+    print(f"  example: {row['file']}  F1 {f1:.2f}  variety {v}  ({len(good)} of {len(scored)} shortlisted with F1 >= {min_f1})")
     return _save(fig, out, "fig05_crop_example")
 
 
@@ -400,7 +450,7 @@ def fig_crop_grid(cfg, models, out, n=100, seed=3):
     for ax, i in zip(axes.flat, order):
         ax.imshow(tiles[i], interpolation="nearest")
     fig.suptitle(f"{len(tiles)} random test crops (each fold's validation threshold, "
-                 f"{min(thrs):.2f}-{max(thrs):.2f})\nGreen = hit | Red = false alarm | Blue = missed | "
+                 f"{min(thrs):.2f}-{max(thrs):.2f})\nGreen = TP (hit) | Red = FP (false alarm) | Blue = FN (missed) | "
                  "Orange = day t fire | Gray = unburned", fontsize=12)
     fig.subplots_adjust(wspace=0.04, hspace=0.04, top=0.93)
     return _save(fig, out, "fig09_crop_grid")
