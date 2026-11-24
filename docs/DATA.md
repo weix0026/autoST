@@ -1,6 +1,6 @@
 # The data: crops and trained models
 
-The data record (Zenodo) has two zip files and this guide. Unzip both zip
+The data record (Zenodo, https://doi.org/10.5281/zenodo.24516025) has two zip files and this guide. Unzip both zip
 files into one folder and set `data_root` in the code's `configs/data.yaml`
 to that folder (code: https://github.com/weix0026/autoST):
 

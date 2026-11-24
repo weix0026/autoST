@@ -8,7 +8,7 @@ the weather in between.
 
 - **Data.** 46,150 crops of 64 x 64 cells (30 m) from 292 western US fires of
   2020-2023 and their 5,491 daily infrared perimeters (NIROPS), with the 10
-  trained models. They are a separate data record (Zenodo; `docs/DATA.md`
+  trained models. They are a separate data record (Zenodo, https://doi.org/10.5281/zenodo.24516025; `docs/DATA.md`
   lists every channel and its source).
 - **Model.** A 3-D U-Net over the input days, with a transformer at the
   bottleneck and attention on the skip connections. It has 33 static channels
@@ -34,7 +34,7 @@ pytest            # about 20 s: the pieces, then the whole chain on made-up crop
 ## Run
 
 ```
-# 0. Download crops.zip and models.zip from the data record and unzip both
+# 0. Download crops.zip and models.zip from https://doi.org/10.5281/zenodo.24516025, unzip both
 #    into one folder. Set data_root in configs/data.yaml to that folder
 #    (or set the environment variable AUTOST_DATA_ROOT).
 

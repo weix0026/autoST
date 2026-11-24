@@ -14,3 +14,11 @@ authors:
 #   type: article
 #   title: "..."
 #   journal: "..."
+references:
+  - type: data
+    title: "AutoST crops and trained models: next-day spread of 292 western US fires, 2020-2023"
+    authors:
+      - family-names: Wei
+        given-names: Yu
+    doi: 10.5281/zenodo.24516025
+    url: "https://doi.org/10.5281/zenodo.24516025"
