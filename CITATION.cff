@@ -3,6 +3,7 @@ message: "If you use this software, please cite it, the data record and the pape
 title: "AutoST: next-day wildfire spread -- training and evaluation from published crops"
 version: 1.0.0
 license: MIT
+repository-code: "https://github.com/weix0026/autoST"
 authors:
   - family-names: Wei
     given-names: Yu

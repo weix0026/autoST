@@ -2,7 +2,7 @@
 
 The data record (Zenodo) has two zip files and this guide. Unzip both zip
 files into one folder and set `data_root` in the code's `configs/data.yaml`
-to that folder (code: GitHub, see `CITATION.cff`):
+to that folder (code: https://github.com/weix0026/autoST):
 
 ```
 <data_root>/
