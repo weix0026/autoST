@@ -18,7 +18,7 @@ the weather in between.
   the epoch and the decision threshold are chosen on the next fold, and the
   test fold is scored once.
 
-The crops were made from public sources (and two others, see `docs/DATA.md`)
+The crops were made from public sources (listed in `docs/DATA.md`)
 as described in the paper's Methods. The code that made them, and whole-fire
 prediction from overlapping crops, are not part of this package.
 
