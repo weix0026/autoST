@@ -1,6 +1,9 @@
-"""AutoST: a 3-D U-Net over the input days, a transformer at the bottleneck,
-channel and spatial attention on the skip connections, and a 2-D path for the
-map layers that do not change by day. Unchanged from the study.
+"""AutoST: a 3-D U-Net over the input days, a transformer at the bottleneck and
+channel and spatial attention on the skip connections. The map layers that do
+not change by day are repeated for each input day and stacked onto the daily
+layers before the first convolution (fusion="input", the published models).
+fusion="bottleneck" is the study's first design: a separate 2-D path for the
+map layers, added at the 4 x 4 bottleneck (it scored lower on every test fold).
 
     x_static  (B, S, H, W)
     x_dynamic (B, T, D, H, W)
@@ -94,21 +97,29 @@ class FireSpreadAutoSTNet(nn.Module):
         out_channels: int = 1,
         t_sequence: int = 3,
         dropout: float = 0.3,
+        fusion: str = "input",
     ):
         super().__init__()
+        # fusion = "bottleneck": the first design (static 2-D branch added at 4x4).
+        # fusion = "input": static layers repeated over the days and stacked onto
+        # the daily layers before the first convolution; no static branch.
+        if fusion not in ("bottleneck", "input"):
+            raise ValueError(fusion)
+        self.fusion = fusion
         self.t_sequence = t_sequence
         pool3d = nn.MaxPool3d((1, 2, 2))
         self.pool3d = pool3d
 
         # 3-D encoder
-        self.enc3d_1 = _conv_block_3d(dynamic_channels, 64, dropout)
+        in3d = dynamic_channels + (static_channels if fusion == "input" else 0)
+        self.enc3d_1 = _conv_block_3d(in3d, 64, dropout)
         self.enc3d_2 = _conv_block_3d(64, 128, dropout)
         self.enc3d_3 = _conv_block_3d(128, 256, dropout)
         self.enc3d_4 = _conv_block_3d(256, 512, dropout)
         self.bottleneck_pool = pool3d
 
         # Static pathway downsampled to bottleneck spatial size
-        self.static_downsample = nn.Sequential(
+        self.static_downsample = None if fusion == "input" else nn.Sequential(
             nn.Conv2d(static_channels, 128, 3, stride=2, padding=1),
             nn.BatchNorm2d(128), nn.ReLU(),
             nn.Conv2d(128, 256, 3, stride=2, padding=1),
@@ -146,6 +157,9 @@ class FireSpreadAutoSTNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x_static, x_dynamic):
+        if self.fusion == "input":
+            T = x_dynamic.shape[1]
+            x_dynamic = torch.cat([x_dynamic, x_static.unsqueeze(1).expand(-1, T, -1, -1, -1)], dim=2)
         x_dynamic = x_dynamic.permute(0, 2, 1, 3, 4)  # B, C, T, H, W
 
         e1 = self.enc3d_1(x_dynamic)
@@ -157,9 +171,10 @@ class FireSpreadAutoSTNet(nn.Module):
         trans_feat = self.transformer_branch(bottleneck_3d)
         bottleneck = torch.cat([bottleneck_3d, trans_feat], dim=1)  # B, 1024, T, H/16, W/16
 
-        static_pooled = self.static_downsample(x_static)
-        static_pooled = static_pooled.unsqueeze(2).repeat(1, 1, self.t_sequence, 1, 1)
-        bottleneck = bottleneck + static_pooled.repeat(1, 2, 1, 1, 1)
+        if self.fusion == "bottleneck":
+            static_pooled = self.static_downsample(x_static)
+            static_pooled = static_pooled.unsqueeze(2).repeat(1, 1, self.t_sequence, 1, 1)
+            bottleneck = bottleneck + static_pooled.repeat(1, 2, 1, 1, 1)
 
         d = self.up4(bottleneck)
         d = torch.cat([d, self.att4(e4)], dim=1)

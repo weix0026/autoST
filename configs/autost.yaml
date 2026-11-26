@@ -25,10 +25,16 @@ folds:
   csv: "crops/folds.csv"     # in data_root: published inside crops.zip
   n: 10
 
+model:
+  # "input": map layers stacked onto the daily layers before the first
+  # convolution (the published models). "bottleneck": the first design, a
+  # separate 2-D path added at the 4 x 4 bottleneck.
+  fusion: "input"
+
 training:
   out_dir: "models"
   name: "autost"
-  epochs: 15                 # the study used 100; best epochs were 3-7 of 20 (docs/CHANGES.md, item 4)
+  epochs: 15                 # the study used 100; the published models' best epochs were 7-15
   batch_size: 16
   lr: 1.0e-4
   weight_decay: 0.0

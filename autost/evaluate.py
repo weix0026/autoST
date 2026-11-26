@@ -38,9 +38,13 @@ from .model import FireSpreadAutoSTNet
 def load_model(path, device):
     ck = torch.load(path, map_location=device, weights_only=False)
     sd = ck["model"]
-    m = FireSpreadAutoSTNet(static_channels=sd["static_downsample.0.weight"].shape[1],
-                            dynamic_channels=sd["enc3d_1.0.weight"].shape[1],
-                            t_sequence=int(ck["config"]["crops"]["sequence"]))
+    # checkpoints without the setting are the first (bottleneck) design
+    fusion = ck["config"].get("model", {}).get("fusion", "bottleneck")
+    n_s = len(ck["static_names"])
+    n_in = sd["enc3d_1.0.weight"].shape[1]
+    m = FireSpreadAutoSTNet(static_channels=n_s,
+                            dynamic_channels=n_in - (n_s if fusion == "input" else 0),
+                            t_sequence=int(ck["config"]["crops"]["sequence"]), fusion=fusion)
     m.load_state_dict(sd)
     return m.to(device).eval(), ck
 

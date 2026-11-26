@@ -166,8 +166,23 @@ def fig_architecture(cfg, out):
     ch, px = [64, 128, 256, 512], [N, N // 2, N // 4, N // 8]
     box, arrow, att = (lambda *a: _arch_box(ax, *a)), (lambda *a, **k: _arch_arrow(ax, *a, **k)), _ARCH_COL["att"][1]
 
-    box(12, 61, 22, H, "Daily inputs", f"{D} layers × {T} days, {N}×{N}", "dyn")
-    arrow((12, 61 - H / 2), (12, lv[0] + H / 2))
+    early = cfg.model.get("model", {}).get("fusion", "input") == "input"
+    g = _ARCH_COL["sta"][1]
+    if early:   # static layers stacked onto the daily layers before Encoder 1
+        Hi, yi, yc, r = 5.6, 62.4, 56.4, 1.6
+        box(12, yi, 22, Hi, "Daily inputs", f"{D} layers × {T} days, {N}×{N}", "dyn")
+        box(37, yi, 22, Hi, "Map inputs", f"{S} layers, {N}×{N}", "sta")
+        ax.add_patch(Circle((12, yc), r, fc="white", ec="#333", lw=1.1, zorder=3))
+        ax.text(12, yc, "C", ha="center", va="center", fontsize=8.5, weight="bold", zorder=4)
+        arrow((12, yi - Hi / 2), (12, yc + r))
+        ax.plot([37, 37], [yi - Hi / 2, yc], color=g, lw=1.1)
+        arrow((37, yc), (12 + r, yc), color=g)
+        ax.text(38.5, yc + 0.2, f"repeated for each of the {T} days",
+                ha="left", va="center", fontsize=7.5, style="italic", color=g)
+        arrow((12, yc - r), (12, lv[0] + H / 2))
+    else:
+        box(12, 61, 22, H, "Daily inputs", f"{D} layers × {T} days, {N}×{N}", "dyn")
+        arrow((12, 61 - H / 2), (12, lv[0] + H / 2))
     box(88, 61, 22, H, "Burn probability", f"next perimeter, {N}×{N}", "out")
     arrow((dx[0], lv[0] + H / 2), (88, 61 - H / 2), label="mean over days,\n1×1 conv", loff=(-9.5, 0))
     for k in range(4):
@@ -183,35 +198,44 @@ def fig_architecture(cfg, out):
 
     # bottom row: bottleneck, transformer, join (C), add the map layers (+)
     yb, ys, xb, xt, xc, xp, trf = 4.0, -3.2, 30, 51.5, 67.5, 76, _ARCH_COL["trf"][1]
+    if early:
+        xb, xt = 32, 53
     box(xb, yb, 17, H, "Bottleneck", f"512 ch, {N // 16}×{N // 16}×{T}", "dyn")
     arrow((xb, lv[3] - H / 2), (xb, yb + H / 2), label="pool", loff=(-3.6, 0))
     box(xt, yb, 19, H, "Transformer", "4 layers, 8 heads", "trf")
     arrow((xb + 8.5, yb), (xt - 9.5, yb), color=trf)
-    for x, sym in ((xc, "C"), (xp, "+")):
+    for x, sym in ((xc, "C"),) + (() if early else ((xp, "+"),)):
         ax.add_patch(Circle((x, yb), 2.3, fc="white", ec="#333", lw=1.1, zorder=3))
         ax.text(x, yb, sym, ha="center", va="center", fontsize=10, weight="bold", zorder=4)
     arrow((xt + 9.5, yb), (xc - 2.3, yb), color=trf)
     ax.plot([xb, xb, xc], [yb - H / 2, -0.9, -0.9], color="#333", lw=1.1)   # the bottleneck joins too
     arrow((xc, -0.9), (xc, yb - 2.3))
-    arrow((xc + 2.3, yb), (xp - 2.3, yb))
     ax.text(xc, yb + 4.2, "1024 ch", ha="center", va="center", fontsize=7.5, style="italic", color="#333")
-    arrow((xp, yb + 2.3), (dx[3], lv[3] - H / 2), label="up-conv", loff=(4.4, 0))
-    g = _ARCH_COL["sta"][1]
-    box(10, yb, 17, H, "Map inputs", f"{S} layers, {N}×{N}", "sta")
-    ax.plot([10, 10, xp], [yb - H / 2, ys, ys], color=g, lw=1.1)
-    arrow((xp, ys), (xp, yb - 2.3), color=g)
-    ax.text(43, ys - 1.9, f"four strided 2-D convolutions down to {N // 16}×{N // 16}, repeated for each of "
-            f"the {T} days", ha="center", va="center", fontsize=7.5, style="italic", color=g)
+    if early:
+        ax.plot([xc + 2.3, xp], [yb, yb], color="#333", lw=1.1)
+        arrow((xp, yb), (dx[3], lv[3] - H / 2), label="up-conv", loff=(4.4, 0))
+    else:
+        arrow((xc + 2.3, yb), (xp - 2.3, yb))
+        arrow((xp, yb + 2.3), (dx[3], lv[3] - H / 2), label="up-conv", loff=(4.4, 0))
+        box(10, yb, 17, H, "Map inputs", f"{S} layers, {N}×{N}", "sta")
+        ax.plot([10, 10, xp], [yb - H / 2, ys, ys], color=g, lw=1.1)
+        arrow((xp, ys), (xp, yb - 2.3), color=g)
+        ax.text(43, ys - 1.9, f"four strided 2-D convolutions down to {N // 16}×{N // 16}, repeated for each of "
+                f"the {T} days", ha="center", va="center", fontsize=7.5, style="italic", color=g)
 
     # key
-    for i, (kind, txt) in enumerate([("dyn", "daily data (3-D conv.)"), ("sta", "map layers (2-D conv.)"),
+    for i, (kind, txt) in enumerate([("dyn", "daily data (3-D conv.)"),
+                                     ("sta", "map layers (static)" if early else "map layers (2-D conv.)"),
                                      ("att", "skip link with attention"), ("trf", "transformer")]):
-        x0, y0 = 27.5 + (i % 2) * 24, 63.2 - (i // 2) * 3.6
+        x0, y0 = ((1.0, 11.5 - i * 3.3) if early else (27.5 + (i % 2) * 24, 63.2 - (i // 2) * 3.6))
         face, edge = _ARCH_COL[kind]
         ax.add_patch(FancyBboxPatch((x0, y0 - 1.1), 2.6, 2.2, boxstyle="round,pad=0,rounding_size=0.4",
                                     fc=face, ec=edge, lw=1.0))
         ax.text(x0 + 3.6, y0, txt, ha="left", va="center", fontsize=7.5, color="#222")
-    ax.text(50, 55.8, "C  join (concatenate)       +  add", ha="center", va="center", fontsize=7.5, color="#222")
+    if early:
+        ax.text(1.0, 11.5 - 4 * 3.3, "C  join (concatenate)", ha="left", va="center", fontsize=7.5, color="#222")
+    else:
+        ax.text(50, 55.8, "C  join (concatenate)       +  add", ha="center", va="center", fontsize=7.5, color="#222")
     fig.savefig(out / "fig03_architecture.png", dpi=300)      # no tight bbox: keep the print size
     fig.savefig(out / "fig03_architecture.pdf")
     plt.close(fig)
@@ -275,7 +299,7 @@ def _variety(s, d):
     return varying + 2 * present + fuels
 
 
-def fig_crop_example(cfg, models, out, seed=11, pool=4000, shortlist=300, min_f1=0.7):
+def fig_crop_example(cfg, models, out, seed=11, pool=4000, shortlist=300, min_f1=0.7, fixed=None):
     """One test crop that shows the inputs well and that the model gets mostly right:
     from `pool` random test crops with a clear band of new spread, the `shortlist`
     with the most varied inputs are predicted, and the most varied one with
@@ -299,8 +323,14 @@ def fig_crop_example(cfg, models, out, seed=11, pool=4000, shortlist=300, min_f1
             tp, fp, fn = (pred & target & m).sum(), (pred & ~target & m).sum(), (~pred & target & m).sum()
             scored.append((2 * tp / max(2 * tp + fp + fn, 1), v, row, s, d, y, p, thr))
     good = [c for c in scored if c[0] >= min_f1]
-    f1, v, row, s, d, y, prob, thr = (max(good, key=lambda c: (c[1], c[0])) if good
-                                      else max(scored, key=lambda c: c[0]))
+    if fixed:   # the same crop as another run's figure, for a side-by-side comparison
+        hit = [c for c in scored if c[2]["file"] == fixed]
+        if not hit:
+            raise ValueError(f"{fixed} not among the shortlisted crops")
+        f1, v, row, s, d, y, prob, thr = hit[0]
+    else:
+        f1, v, row, s, d, y, prob, thr = (max(good, key=lambda c: (c[1], c[0])) if good
+                                          else max(scored, key=lambda c: c[0]))
     fold = int(row["fold"])
     today, target = d[-1, 0] > 0, y[0] > 0
     pred = prob >= thr
@@ -461,6 +491,9 @@ def main(argv=None):
     ap.add_argument("--data-config", default=None)
     ap.add_argument("--config", default=None)
     ap.add_argument("--only", default=None, help="comma-separated figure numbers, e.g. 6,8")
+    ap.add_argument("--example-crop", default=None,
+                    help="figure 5: draw this crop (manifest 'file'); the paper's is "
+                         "CA-SHF-001187_Monument/2021-09-13_04.npz")
     a = ap.parse_args(argv)
     cfg = C.load(a.data_config, a.config)
     out = cfg.data_path("figures")
@@ -469,7 +502,7 @@ def main(argv=None):
     models = Models(cfg) if want & {5, 9} else None
     steps = [(3, lambda: fig_architecture(cfg, out)),
              (4, lambda: fig_correlation(cfg, out)),
-             (5, lambda: fig_crop_example(cfg, models, out)),
+             (5, lambda: fig_crop_example(cfg, models, out, fixed=a.example_crop)),
              (6, lambda: fig_training(cfg, out)),
              (7, lambda: fig_attribution(cfg, out)),
              (8, lambda: fig_thresholds(cfg, out)),

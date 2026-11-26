@@ -11,8 +11,13 @@ to that folder (code: https://github.com/weix0026/autoST):
   crops/<incident>/<date>_<k>.npz    46,150 crops from 292 fires
   models/autost_fold<k>.pt           the 10 trained models (k = 1..10)
   models/autost_fold<k>_log.csv      loss and validation scores per epoch
-  evaluation/*.csv                   the test scores in the paper
+  evaluation/*.csv                   the test scores and channel attributions in the paper
+                                     (attribution_groups.csv: totals for groups of channels)
 ```
+
+The models are the early-fusion design: the 33 map layers are repeated for
+each of the three input days and stacked onto the 18 daily layers before the
+first convolution.
 
 Each of the 309 fires is in exactly one of 10 folds, 30 to 32 fires per fold
 (28 to 30 of them with crops: 17 fires with only three perimeters have no

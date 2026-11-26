@@ -130,7 +130,8 @@ def train_fold(cfg, fold: int, epochs=None, max_crops=None, fresh=False, device=
     firelines = bool(cfg.model["channels"]["firelines"])
     (xs, xd), _ = train_dl.dataset[0]
     model = FireSpreadAutoSTNet(static_channels=xs.shape[0], dynamic_channels=xd.shape[1],
-                                t_sequence=xd.shape[0]).to(device)
+                                t_sequence=xd.shape[0],
+                                fusion=cfg.model.get("model", {}).get("fusion", "input")).to(device)
     if xs.shape[0] != len(CH.static_names(firelines)):
         raise ValueError(f"crops have {xs.shape[0]} static channels; configs say "
                          f"{len(CH.static_names(firelines))} (firelines={firelines}). Set channels.firelines to match the crops.")

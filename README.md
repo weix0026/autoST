@@ -11,8 +11,9 @@ the weather in between.
   trained models. They are a separate data record (Zenodo, https://doi.org/10.5281/zenodo.24516025; `docs/DATA.md`
   lists every channel and its source).
 - **Model.** A 3-D U-Net over the input days, with a transformer at the
-  bottleneck and attention on the skip connections. It has 33 static channels
-  and 18 daily channels.
+  bottleneck and attention on the skip connections. Its 33 static channels are
+  repeated for each input day and stacked onto the 18 daily channels before the
+  first convolution.
 - **Testing.** 10-fold cross-validation by fire, with whole fires in each fold
   (`crops/folds.csv` in the data record). For each test fold, a model is trained on eight folds,
   the epoch and the decision threshold are chosen on the next fold, and the
@@ -42,8 +43,10 @@ pytest            # about 20 s: the pieces, then the whole chain on made-up crop
 python -m autost.evaluate                    # --attribution adds Integrated Gradients (slow)
 #    -> <data_root>/evaluation/per_fold.csv, pooled.csv, summary.csv, sweep.csv
 #    Compare with the published evaluation/*.csv.
+python -m autost.groups                      # after --attribution: totals for groups of channels
+#    -> <data_root>/evaluation/attribution_groups.csv
 
-# 2. Or train the 10 models yourself (about 15 h on one RTX 5000 Ada; resumable)
+# 2. Or train the 10 models yourself (about 10 h on one RTX 5000 Ada; resumable)
 #    Set training.out_dir in configs/autost.yaml to a new folder first, or the
 #    published models are overwritten.
 python -m autost.train
@@ -51,7 +54,8 @@ python -m autost.train --folds 3             # one fold
 
 # 3. The paper's figures 3-9 (architecture, correlation, crop example,
 #    training curves, attribution, threshold curves, 100-crop grid)
-python -m autost.figures                     # --only 6,8 for some of them
+python -m autost.figures --example-crop CA-SHF-001187_Monument/2021-09-13_04.npz
+#    (--only 6,8 for some of them; --example-crop picks the paper's crop example)
 #    -> <data_root>/figures
 ```
 
@@ -80,6 +84,7 @@ epoch, its threshold and its validation scores.
 | `autost/train.py` | training, one model per test fold |
 | `autost/metrics.py` | pooled scores (F1, precision, recall, AUC, PR-AUC, MCC, TSS) |
 | `autost/evaluate.py` | test scores per fold and pooled; optional channel attribution |
+| `autost/groups.py` | attribution totals for groups of correlated channels |
 | `autost/figures.py` | the paper's figures 3-9 from a finished run |
 
 ## Citation

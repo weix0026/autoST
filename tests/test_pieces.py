@@ -65,3 +65,18 @@ def test_front_band():
     fire[4, 4] = True
     b = front_band(fire, 1)
     assert b.sum() == 8 and not b[4, 4]
+
+
+def test_group_totals_add_up_channel_attributions():
+    """Every group's channels exist in the model, and a group total is the sum of its channels."""
+    import pandas as pd
+    from autost import channels as CH
+    from autost.groups import GROUPS, group_totals
+    names = CH.static_names(True) + list(CH.DYNAMIC_NAMES)
+    rows = [{"fold": k, "kind": "x", "channel": c, "attribution": 0.01 * (i + 1) * k}
+            for k in (1, 2) for i, c in enumerate(names)]
+    out = group_totals(pd.DataFrame(rows)).set_index("group")
+    for g, (chans, _) in GROUPS.items():
+        expect = sum(0.01 * (names.index(c) + 1) for c in chans)
+        assert abs(out.loc[g, "fold1"] - expect) < 1e-9
+        assert abs(out.loc[g, "fold2"] - 2 * expect) < 1e-9
